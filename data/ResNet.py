@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from torchvision import models
 from pathlib import Path
 from collections import Counter
+import matplotlib.pyplot as plt
 
 
 def load_data_and_create_dataset(x_path, y_path):
@@ -56,26 +57,38 @@ def main():
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    # Training loop
     num_epochs = 10
+    train_losses = []
+
     for epoch in range(num_epochs):
         model.train()
+        batch_losses = []
+
         for inputs, labels in train_loader:
             inputs, labels = inputs.to(device), labels.to(device)
-
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
+            batch_losses.append(loss.item())
 
-        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item()}")
+        epoch_loss = sum(batch_losses) / len(batch_losses)
+        train_losses.append(epoch_loss)
+        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss:.4f}")
+
+        # Plotting the training loss
+        plt.figure(figsize=(10, 5))
+        plt.plot(range(1, epoch + 2), train_losses, label='Train Loss')
+        plt.title('Training Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.show()
 
     # Save the trained model
     torch.save(model.state_dict(), 'resnet_model.pth')
     print("Finished Training and saved the model")
-
-
 
 
 if __name__ == "__main__":

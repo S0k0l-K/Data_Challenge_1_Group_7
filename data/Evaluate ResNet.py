@@ -5,6 +5,8 @@ from torch.utils.data import DataLoader, TensorDataset
 from torchvision import models
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from pathlib import Path
+from ResNet import CustomResNet
+from ResNet import load_data_and_create_dataset
 
 # CustomResNet and load_data_and_create_dataset definitions go here
 # They should be identical to those in your training script
