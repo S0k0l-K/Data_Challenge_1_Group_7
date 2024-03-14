@@ -22,11 +22,20 @@ from pathlib import Path
 from typing import List
 from collections import Counter
 import numpy as np
+import os
+from pathlib import Path
 
-train_dataset = ImageDataset(Path("X_train.npy"), Path("Y_train.npy"))
-test_dataset = ImageDataset(Path("X_test.npy"), Path("Y_test.npy"))
+current_script_path = Path(__file__).parent.parent
 
+# Now, construct the paths to your dataset files correctly
+train_x_path = current_script_path / "data" / "X_train.npy"
+train_y_path = current_script_path / "data" / "Y_train.npy"
+test_x_path = current_script_path / "data" / "X_test.npy"
+test_y_path = current_script_path / "data" / "Y_test.npy"
 
+# Assuming you have the appropriate constructor for ImageDataset, use the paths
+train_dataset = ImageDataset(train_x_path, train_y_path)
+test_dataset = ImageDataset(test_x_path, test_y_path)
 
 # Function to calculate class counts
 def calculate_class_sample_counts(dataset):

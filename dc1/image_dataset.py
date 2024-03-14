@@ -64,10 +64,12 @@ def load_numpy_arr_from_url(url: str) -> np.ndarray:
 
 if __name__ == "__main__":
     cwd = os.getcwd()
-    if path.exists(path.join(cwd + "data/")):
+    data_dir = path.join(cwd, "data")  # Correctly joining path components
+    if path.exists(data_dir):
         print("Data directory exists, files may be overwritten!")
     else:
-        os.mkdir(path.join(cwd, "../data/"))
+        os.mkdir(data_dir)  # Create the directory without "../"
+
     ### Load labels
     train_y = load_numpy_arr_from_url(
         url="https://surfdrive.surf.nl/files/index.php/s/i6MvQ8nqoiQ9Tci/download"
