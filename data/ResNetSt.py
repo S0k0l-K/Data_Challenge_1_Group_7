@@ -8,12 +8,15 @@ from pathlib import Path
 from collections import Counter
 import matplotlib.pyplot as plt
 import argparse
+import os
+
 
 # Assuming dc1 modules are correctly implemented and available in the environment
 from dc1.batch_sampler import BatchSampler
 from dc1.image_dataset import ImageDataset
 from dc1.net import Net
 from dc1.train_test import train_model, test_model
+
 
 # Function to calculate class counts
 def calculate_class_sample_counts(dataset):
