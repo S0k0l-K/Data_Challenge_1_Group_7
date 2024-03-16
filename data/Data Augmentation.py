@@ -25,4 +25,5 @@ np.save('zoomed_subset_images_trial.npy', zoomed_images_batch)
 np.save('augmented_subset_images_trial.npy', augmented_images_batch)
 
 
-
+combined_dataset = np.concatenate([subset_images, augmented_images_batch, zoom_generator], axis=0)
+np.save('combined_subset_images.npy', combined_dataset)
