@@ -1,6 +1,9 @@
 # Custom imports
+from torch.utils.data import WeightedRandomSampler, DataLoader
+
 from dc1.batch_sampler import BatchSampler
 from dc1.image_dataset import ImageDataset
+
 from dc1.net import Net
 from dc1.train_test import train_model, test_model
 
@@ -20,18 +23,80 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
+from dc1.alexnet import AlexNet
+import numpy as np
+from torchvision import transforms
+
+from sklearn.metrics import classification_report
+
+def evaluate_model(model, test_dataset, device):
+    model.eval()
+    all_preds = []
+    all_labels = []
+    with torch.no_grad():
+        for inputs, labels in test_dataset:
+            inputs, labels = inputs.to(device), labels.to(device).long()
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+            all_preds.extend(preds.view(-1).cpu().numpy())
+            all_labels.extend(labels.view(-1).cpu().numpy())
+
+    target_names =['Atelectasis', 'Effusion', 'Infiltration', 'No finding', 'Nodule', 'Pneumothorax']
+    print(classification_report(all_labels, all_preds, target_names=target_names))
+
+    # Compute general accuracy, F1 score, precision, and recall
+    accuracy = (all_preds == all_labels).mean()
+    f1 = classification_report(all_labels, all_preds, target_names=target_names, output_dict=True)['macro avg']['f1-score']
+    precision = classification_report(all_labels, all_preds, target_names=target_names, output_dict=True)['macro avg']['precision']
+    recall = classification_report(all_labels, all_preds, target_names=target_names, output_dict=True)['macro avg']['recall']
+
+    print(f"General Accuracy: {accuracy}")
+    print(f"General F1 Score: {f1}")
+    print(f"General Precision: {precision}")
+    print(f"General Recall: {recall}")
+
+    return accuracy, f1, precision, recall
+
+
+
 
 def main(args: argparse.Namespace, activeloop: bool = True) -> None:
 
     # Load the train and test data set
-    train_dataset = ImageDataset(Path("data/X_train.npy"), Path("data/Y_train.npy"))
-    test_dataset = ImageDataset(Path("data/X_test.npy"), Path("data/Y_test.npy"))
+    #train_dataset = ImageDataset(Path("data/X_train.npy"), Path("data/Y_train.npy"))
+    #test_dataset = ImageDataset(Path("data/X_test.npy"), Path("data/Y_test.npy"))
+
+    transform = transforms.Compose([
+        transforms.ToPILImage(),  # Convert numpy arrays to PIL images first if necessary
+        transforms.Grayscale(num_output_channels=1),  # Ensure images are greyscale
+        # Apply other transformations here, such as resizing or normalization
+        transforms.ToTensor(),  # Convert PIL images to tensors
+    ])
+
+    train_dataset = ImageDataset(Path("../data/resized_X_train1.npy"), Path("../data/Y_train.npy"), transform=transform)
+    test_dataset = ImageDataset(Path("../data/resized_X_test1.npy"), Path("../data/Y_test.npy"), transform=transform)
+
+    #Data Stratification
+    #train_labels = train_d.targets  # Now directly accessing the labels
+    #class_sample_counts = [2521, 2318, 2964, 6103, 1633, 1302]
+    #total_samples = sum(class_sample_counts)
+    #class_weights = [total_samples / count for count in class_sample_counts]
+    # List of weights
+    #sample_weights = [class_weights[label] for label in train_labels]
+    # Creating a sampler
+    #sampler = WeightedRandomSampler(weights=sample_weights, num_samples=len(sample_weights), replacement=True)
+    # DataLoader for training and testing, now using the sampler for balanced classes
+    #train_sampler = DataLoader(train_d, batch_size=args.batch_size, sampler=sampler)
+    #test_sampler= DataLoader(test_d, batch_size=args.batch_size, shuffle=False)
+
 
     # Load the Neural Net. NOTE: set number of distinct labels here
-    model = Net(n_classes=6)
-
+    #model = Net(n_classes=6)
+    model= AlexNet(num_classes=6)
     # Initialize optimizer(s) and loss function(s)
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.1)
+    #optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.1)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
     loss_function = nn.CrossEntropyLoss()
 
     # fetch epoch and batch count from arguments
@@ -50,7 +115,8 @@ def main(args: argparse.Namespace, activeloop: bool = True) -> None:
         device = "cuda"
         model.to(device)
         # Creating a summary of our model and its layers:
-        summary(model, (1, 128, 128), device=device)
+        #summary(model, (1, 128, 128), device=device)
+        summary(model, (1, 256, 256), device=device)
     elif (
         torch.backends.mps.is_available() and not DEBUG
     ):  # PyTorch supports Apple Silicon GPU's from version 1.12
@@ -61,21 +127,24 @@ def main(args: argparse.Namespace, activeloop: bool = True) -> None:
         print("@@@ No GPU boosting device found, training on CPU...")
         device = "cpu"
         # Creating a summary of our model and its layers:
-        summary(model, (1, 128, 128), device=device)
+        #summary(model, (1, 128, 128), device=device)
+        summary(model, (1, 256, 256), device=device)
 
     # Lets now train and test our model for multiple epochs:
-    train_sampler = BatchSampler(
-        batch_size=batch_size, dataset=train_dataset, balanced=args.balanced_batches
-    )
-    test_sampler = BatchSampler(
-        batch_size=100, dataset=test_dataset, balanced=args.balanced_batches
-    )
+    train_sampler = BatchSampler(batch_size=batch_size, dataset=train_dataset, balanced=args.balanced_batches)
+    test_sampler = BatchSampler(batch_size=100, dataset=test_dataset, balanced=args.balanced_batches)
+
+
+
+
 
     mean_losses_train: List[torch.Tensor] = []
     mean_losses_test: List[torch.Tensor] = []
     
     for e in range(n_epochs):
         if activeloop:
+
+
 
             # Training:
             losses = train_model(model, train_sampler, optimizer, loss_function, device)
@@ -107,10 +176,25 @@ def main(args: argparse.Namespace, activeloop: bool = True) -> None:
     # check if model_weights/ subdir exists
     if not Path("model_weights/").exists():
         os.mkdir(Path("model_weights/"))
-    
+
+    #Evaluation
+
+    accuracy, f1, precision, recall = evaluate_model(model, test_sampler, device)
+
     # Saving the model
+
+    model_file_path = f"model_weights/model_{now.month:02}_{now.day:02}_{now.hour}_{now.minute:02}.pth"
+    torch.save(model.state_dict(), model_file_path)
+    print(f"Trained model saved at: {model_file_path}")
+
     torch.save(model.state_dict(), f"model_weights/model_{now.month:02}_{now.day:02}_{now.hour}_{now.minute:02}.txt")
-    
+
+
+
+    # Evaluation after training
+    #evaluate_model(model, test_dataset, loss_function, device)
+
+
     # Create plot of losses
     figure(figsize=(9, 10), dpi=80)
     fig, (ax1, ax2) = plt.subplots(2, sharex=True)
