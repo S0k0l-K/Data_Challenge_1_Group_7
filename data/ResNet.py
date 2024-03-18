@@ -11,16 +11,14 @@ import matplotlib.pyplot as plt
 
 def load_data_and_create_dataset(x_path, y_path):
     base_path = Path(__file__).parent
-    x_path = base_path / x_path  # Correct path construction
+    x_path = base_path / x_path  
     y_path = base_path / y_path
 
-    x = np.load(x_path)  # Load the data correctly
+    x = np.load(x_path)  
     y = np.load(y_path)
 
-    # No need to reshape or add a channel dimension since the data is already in the correct shape
-    print("Loaded x shape:", x.shape)  # Debug: Check the shape
+    print("Loaded x shape:", x.shape)  
 
-    # Convert numpy arrays to PyTorch tensors, ensuring the correct type
     x_tensor = torch.tensor(x, dtype=torch.float32)
     y_tensor = torch.tensor(y, dtype=torch.long)
     dataset = TensorDataset(x_tensor, y_tensor)
@@ -32,7 +30,6 @@ class CustomResNet(nn.Module):
     def __init__(self, num_classes=6):
         super(CustomResNet, self).__init__()
         self.resnet = models.resnet18(weights=None)
-        # Adjust the first Conv2d layer to accept 1 channel input for grayscale images
         self.resnet.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         self.resnet.fc = nn.Linear(self.resnet.fc.in_features, num_classes)
 
@@ -44,11 +41,9 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # Modify paths as needed
     x_path = Path(__file__).parent.parent / "data" / "X_train.npy"
     y_path = Path(__file__).parent.parent / "data" / "Y_train.npy"
 
-    # Load the dataset
     train_dataset = load_data_and_create_dataset(x_path, y_path)
 
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
@@ -77,7 +72,6 @@ def main():
         train_losses.append(epoch_loss)
         print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss:.4f}")
 
-        # Plotting the training loss
         plt.figure(figsize=(10, 5))
         plt.plot(range(1, epoch + 2), train_losses, label='Train Loss')
         plt.title('Training Loss')
@@ -86,7 +80,6 @@ def main():
         plt.legend()
         plt.show()
 
-    # Save the trained model
     torch.save(model.state_dict(), 'resnet_model.pth')
     print("Finished Training and saved the model")
 
