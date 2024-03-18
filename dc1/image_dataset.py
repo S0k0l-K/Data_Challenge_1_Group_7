@@ -16,18 +16,24 @@ class ImageDataset:
     to pass the data through the neural network and apply weights).
     """
 
-    def __init__(self, x: Path, y: Path) -> None:
+    def __init__(self, x: Path, y: Path, transform= None) -> None:
         # Target labels
         self.targets = ImageDataset.load_numpy_arr_from_npy(y)
         # Images
         self.imgs = ImageDataset.load_numpy_arr_from_npy(x)
 
+        self.transform= transform
     def __len__(self) -> int:
         return len(self.targets)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, np.ndarray]:
-        image = torch.from_numpy(self.imgs[idx] / 255).float()
+        image = self.imgs[idx]
         label = self.targets[idx]
+        if self.transform:
+            image = self.transform(image)
+
+        #image = torch.from_numpy(image / 255).float()
+
         return image, label
 
     @staticmethod
@@ -63,11 +69,15 @@ def load_numpy_arr_from_url(url: str) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    cwd = os.getcwd()
-    if path.exists(path.join(cwd + "data/")):
-        print("Data directory exists, files may be overwritten!")
-    else:
-        os.mkdir(path.join(cwd, "../data/"))
+    #cwd = os.getcwd()
+    #if path.exists(path.join(cwd + "data/")):
+        #print("Data directory exists, files may be overwritten!")
+    #else:
+        #os.mkdir(path.join(cwd, "../data/"))
+    cwd = path.abspath(path.dirname(__file__))
+    data_dir = path.join(cwd, "../data")
+    print(f"Data directory path: {data_dir}")
+
     ### Load labels
     train_y = load_numpy_arr_from_url(
         url="https://surfdrive.surf.nl/files/index.php/s/i6MvQ8nqoiQ9Tci/download"
