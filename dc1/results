@@ -1,3 +1,17 @@
+ Train:
+              precision    recall  f1-score   support
+
+ Atelectasis       0.36      0.17      0.23      2521
+    Effusion       0.38      0.33      0.35      2318
+Infiltration       0.29      0.12      0.17      2964
+  No Finding       0.42      0.85      0.56      6103
+      Nodule       0.40      0.00      0.00      1633
+Pneumothorax       0.47      0.02      0.03      1302
+
+    accuracy                           0.40     16841
+   macro avg       0.39      0.25      0.22     16841
+weighted avg       0.38      0.40      0.32     16841
+
 Test Classification Report:
               precision    recall  f1-score   support
 
@@ -13,5 +27,3 @@ Pneumothorax       0.53      0.03      0.05       681
 weighted avg       0.34      0.39      0.31      8420
 
 Epoch [10/10], Train Loss: 0.2427, Train Acc: 40.12%, Test Loss: 0.2495, Test Acc: 38.65%
-
-Process finished with exit code 0
