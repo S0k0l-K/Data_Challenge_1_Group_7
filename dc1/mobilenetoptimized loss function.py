@@ -115,7 +115,8 @@ transform = transforms.Compose([
     transforms.ToPILImage(),
     transforms.Resize((224, 224)),  # Resize the image to 224x224
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485], std=[0.229])  # Adjust for grayscale image
+    transforms.Normalize(mean=[0.485], std=[0.229]),  # Adjust for grayscale image
+    transforms.RandomAffine(degrees=15, scale=(0.9, 1.1))
 ])
 
 # Load datasets
@@ -234,11 +235,17 @@ for epoch in range(num_epochs):
     test_accuracy = 100.0 * correct / total
     test_precision = precision_score(test_targets, test_preds, average=None)
     test_recall = recall_score(test_targets, test_preds, average=None)
+
+    torch.save(model.state_dict(), 'MobilNet_aug.pth')
     # Generate classification report
     print("Train Classification Report:")
-    print(classification_report(train_targets, train_preds, target_names=[class_index_to_name[i] for i in range(len(class_names))]))
+    print(classification_report(train_targets, train_preds,
+                                target_names=[class_index_to_name[i] for i in range(len(class_names))]))
     print("Test Classification Report:")
-    print(classification_report(test_targets, test_preds, target_names=[class_index_to_name[i] for i in range(len(class_names))]))
+    print(classification_report(test_targets, test_preds,
+                                target_names=[class_index_to_name[i] for i in range(len(class_names))]))
     print(f"Epoch [{epoch + 1}/{num_epochs}], "
           f"Train Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.2f}%, "
           f"Test Loss: {test_loss:.4f}, Test Acc: {test_accuracy:.2f}%")
+
+torch.save(model.state_dict(), 'MobilNet_aug.pth')
