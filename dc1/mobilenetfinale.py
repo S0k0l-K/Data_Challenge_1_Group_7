@@ -1,12 +1,20 @@
-import numpy as np
+
+from torch.utils.data import Dataset, DataLoader
+from dc1.batch_sampler import BatchSampler
+from dc1.image_dataset import ImageDataset
+import plotext  # type: ignore
+from pathlib import Path
 import torch
 import torch.nn as nn
 import torchvision.models as models
-import torchvision.transforms as transforms
-from torch.utils.data import Dataset, DataLoader
-from sklearn.metrics import classification_report, f1_score
-from pathlib import Path
+from torch.utils.data import DataLoader
 import torch.optim as optim
+import torchvision.transforms as transforms
+import numpy as np
+from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
+from torch.optim import Adam
+import torch.nn.functional as F
+
 
 class CustomDataset(Dataset):
     def __init__(self, images, labels, transform=None):
@@ -20,24 +28,22 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         image = self.images[idx]
         label = self.labels[idx]
+        # Convert image to uint8
         image = image.astype(np.uint8)
-        image = image.reshape(128, 128, 1)  # Ensure image is in the format (H, W, C)
+        # Ensure image is in the format (H, W, C)
+        image = image.reshape(128, 128, 1)
         if self.transform:
             image = self.transform(image)
         return image, label
 
-# Enhanced data augmentation
 transform = transforms.Compose([
     transforms.ToPILImage(),
-    transforms.Resize((224, 224)),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(10),
-    transforms.RandomAffine(degrees=15, scale=(0.9, 1.1)),
+    transforms.Resize((224, 224)),  # Resize the image to 224x224
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.5113557577133179], std=[0.24621723592281342]),
+    transforms.RandomAffine(degrees=15, scale=(0.9, 1.1))
 ])
 
-# Load datasets
 data_path = Path(__file__).parent.parent
 train_x_path = data_path / "data/X_train.npy"
 train_y_path = data_path / "data/Y_train.npy"
@@ -47,29 +53,19 @@ test_y_path = data_path / "data/Y_test.npy"
 x_train, y_train = np.load(train_x_path), np.load(train_y_path)
 x_test, y_test = np.load(test_x_path), np.load(test_y_path)
 
-train_dataset = CustomDataset(x_train, y_train, transform=transform)
-test_dataset = CustomDataset(x_test, y_test, transform=transform)
+train_dataset = ImageDataset(train_x_path, train_y_path)
+test_dataset = ImageDataset(test_x_path, test_y_path)
 
-# Initialize DataLoader
-batch_size = 64
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-# Initialize the model
-model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT)
-model.features[0][0] = nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1, bias=False)
-model.classifier[1] = nn.Linear(model.classifier[1].in_features, 6)
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model.to(device)
-
-# Adjusted FocalLoss with class weights
 class_counts = [np.sum(y_train == i) for i in range(6)]
-class_weights = torch.tensor([1.0 / count for count in class_counts], dtype=torch.float32).to(device)
+class_weights = torch.tensor([1.0 / count for count in class_counts], dtype=torch.float32)
 class_weights = class_weights / class_weights.sum()  # Normalize weights
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+class_weights = class_weights.to(device)
+
 
 class FocalLoss(nn.Module):
-    def __init__(self, weight=None, alpha=0.25, gamma=2.0, reduction='mean'):
+    def __init__(self, weight=None, alpha=1, gamma=2, reduction='mean'):
         super(FocalLoss, self).__init__()
         self.weight = weight
         self.alpha = alpha
@@ -79,38 +75,74 @@ class FocalLoss(nn.Module):
     def forward(self, inputs, targets):
         BCE_loss = nn.functional.cross_entropy(inputs, targets, reduction='none', weight=self.weight)
         pt = torch.exp(-BCE_loss)
-        if self.weight is not None:
-            alpha_factor = self.weight.gather(0, targets.data.view(-1))
-        else:
-            alpha_factor = torch.tensor(self.alpha, device=inputs.device)
-        alpha_factor = alpha_factor.view(-1, 1)
+        alpha_factor = self.weight[targets] if self.weight is not None else self.alpha
         F_loss = alpha_factor * (1 - pt) ** self.gamma * BCE_loss
 
         if self.reduction == 'mean':
-            return F_loss.mean()
+            return torch.mean(F_loss)
         elif self.reduction == 'sum':
-            return F_loss.sum()
+            return torch.sum(F_loss)
         else:
             return F_loss
 
-criterion = FocalLoss(weight=class_weights, alpha=0.25, gamma=2.0, reduction='mean').to(device)
-optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5)
+
+batch_size = 64
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+train_batch_sampler = BatchSampler(batch_size=64, dataset=train_dataset, balanced=True)
+test_batch_sampler = BatchSampler(batch_size=64, dataset=test_dataset, balanced=True)
+
+
+class CustomMobileNet(nn.Module):
+    def __init__(self, num_classes=6):
+        super(CustomMobileNet, self).__init__()
+        self.mobilenet = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT)
+
+        self.mobilenet.features[0][0] = nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=3, bias=False)
+
+        in_features = self.mobilenet.classifier[1].in_features
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(in_features, 128),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(128, num_classes)
+        )
+
+    def forward(self, x):
+        # Pass input through the feature extractor
+        x = self.mobilenet.features(x)
+
+        # Pool the features into a single 1280-dimension vector per image
+        x = F.adaptive_avg_pool2d(x, (1, 1))
+        x = torch.flatten(x, 1)
+
+        # Pass the pooled features through the classifier (the dense layers we defined)
+        x = self.classifier(x)
+
+        return x
+
+
+# Initialize the model
+model = CustomMobileNet(num_classes=6)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
+criterion = FocalLoss(alpha=1, gamma=2).to(device)
+optimizer = Adam(model.parameters(), lr=0.001)
+
 
 num_epochs = 10
-
-best_val_accuracy = 0.0
-model_save_path = 'MobileNet_best_val_accuracy.pth'
-
 for epoch in range(num_epochs):
     model.train()
     running_loss = 0.0
     correct = 0
     total = 0
+    train_preds = []
+    train_targets = []
 
-    for images, labels in train_loader:
+    for images, labels in train_batch_sampler:
         images, labels = images.to(device), labels.to(device)
-        labels = labels.long()  # Convert labels to torch.long
         optimizer.zero_grad()
         outputs = model(images)
         loss = criterion(outputs, labels)
@@ -119,49 +151,52 @@ for epoch in range(num_epochs):
 
         running_loss += loss.item()
         _, predicted = torch.max(outputs, 1)
+        train_preds.extend(predicted.cpu().numpy())
+        train_targets.extend(labels.cpu().numpy())
         total += labels.size(0)
-        correct += (predicted == labels).sum().item()
-
-    train_loss = running_loss / len(train_loader)
-    train_accuracy = correct / total * 100
-
-    # Validation step
+        correct += predicted.eq(labels).sum().item()
+    train_loss = running_loss / len(train_batch_sampler)
+    train_accuracy = 100.0 * correct / total
+    train_precision = precision_score(train_targets, train_preds, average=None)
+    train_recall = recall_score(train_targets, train_preds, average=None)
+    class_names = ['Atelectasis', 'Effusion', 'Infiltration', 'No Finding','Nodule','Pneumothorax']
     model.eval()
-    val_running_loss = 0.0
-    val_correct = 0
-    val_total = 0
+    test_loss = 0.0
+    correct = 0
+    total = 0
     test_preds = []
     test_targets = []
 
+    class_index_to_name = {i: class_names[i] for i in range(len(class_names))}
+
     with torch.no_grad():
-        for images, labels in test_loader:
+        for images, labels in test_batch_sampler:
             images, labels = images.to(device), labels.to(device)
+            labels = labels.long()
             outputs = model(images)
             loss = criterion(outputs, labels)
-            val_running_loss += loss.item()
-            _, predicted = torch.max(outputs, 1)
-            val_total += labels.size(0)
-            val_correct += (predicted == labels).sum().item()
-            test_preds.extend(predicted.view(-1).cpu().numpy())
-            test_targets.extend(labels.view(-1).cpu().numpy())
+            test_loss += loss.item()
+            _, predicted = outputs.max(1)
+            test_preds.extend(predicted.cpu().numpy())
+            test_targets.extend(labels.cpu().numpy())
+            total += labels.size(0)
+            correct += predicted.eq(labels).sum().item()
+            predicted_classes = [class_index_to_name[p.item()] for p in predicted]
+            true_classes = [class_index_to_name[l.item()] for l in labels]
+    test_loss /= len(test_batch_sampler)
+    test_accuracy = 100.0 * correct / total
+    test_precision = precision_score(test_targets, test_preds, average=None)
+    test_recall = recall_score(test_targets, test_preds, average=None)
 
-    test_loss = val_running_loss / len(test_loader)
-    test_accuracy = val_correct / val_total * 100
+    torch.save(model.state_dict(), 'MobilNetFinal.pth')
+    print("Train Classification Report:")
+    print(classification_report(train_targets, train_preds,
+                                target_names=[class_index_to_name[i] for i in range(len(class_names))]))
+    print("Test Classification Report:")
+    print(classification_report(test_targets, test_preds,
+                                target_names=[class_index_to_name[i] for i in range(len(class_names))]))
+    print(f"Epoch [{epoch + 1}/{num_epochs}], "
+          f"Train Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.2f}%, "
+          f"Test Loss: {test_loss:.4f}, Test Acc: {test_accuracy:.2f}%")
 
-    # Checkpointing
-    if test_accuracy > best_val_accuracy:
-        best_val_accuracy = test_accuracy
-        torch.save(model.state_dict(), model_save_path)
-
-    scheduler.step(test_loss)  # Adjust the learning rate based on the validation loss
-
-    print(
-        f'Epoch {epoch + 1}/{num_epochs}, Train Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.2f}, Test Loss: {test_loss:.4f}, Test Acc: {test_accuracy:.2f}')
-
-# Final metrics and classification report after training
-test_f1 = f1_score(test_targets, test_preds, average='weighted')
-class_names = ['Atelectasis', 'Effusion', 'Infiltration', 'No Finding', 'Nodule', 'Pneumothorax']
-print("Final Test Classification Report:")
-print(classification_report(test_targets, test_preds, target_names=class_names))
-final_model_save_path = 'MobileNet_final_epoch.pth'
-torch.save(model.state_dict(), final_model_save_path)
+torch.save(model.state_dict(), 'MobilNetFinal1.pth')
