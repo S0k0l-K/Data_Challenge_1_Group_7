@@ -1,93 +1,18 @@
 
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-from torchvision import models, transforms
-import matplotlib.pyplot as plt
-from pathlib import Path
-from sklearn.metrics import classification_report
-
 from dc1.batch_sampler import BatchSampler
 from dc1.image_dataset import ImageDataset
-from dc1.net import Net
-from dc1.train_test import train_model, test_model
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torchsummary import summary  # type: ignore
-
-import matplotlib.pyplot as plt  # type: ignore
-from matplotlib.pyplot import figure
-import os
-import argparse
 import plotext  # type: ignore
-from datetime import datetime
 from pathlib import Path
-from typing import List
-
-# import numpy as np
-# import tensorflow as tf
-# from tensorflow.keras.applications import MobileNetV2
-# from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
-# from tensorflow.keras.models import Model
-# from tensorflow.keras.optimizers import Adam
-# from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
-
-
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-from torchvision import models, transforms
-import matplotlib.pyplot as plt
-from pathlib import Path
-from sklearn.metrics import classification_report
-
-from dc1.batch_sampler import BatchSampler
-from dc1.image_dataset import ImageDataset
-from dc1.net import Net
-from dc1.train_test import train_model, test_model
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torchsummary import summary  # type: ignore
-
-import matplotlib.pyplot as plt  # type: ignore
-from matplotlib.pyplot import figure
-import os
-import argparse
-import plotext  # type: ignore
-from datetime import datetime
-from pathlib import Path
-from typing import List
-
-# import numpy as np
-# import tensorflow as tf
-# from tensorflow.keras.applications import MobileNetV2
-# from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
-# from tensorflow.keras.models import Model
-# from tensorflow.keras.optimizers import Adam
-# from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
-
 import torch
 import torch.nn as nn
 import torchvision.models as models
-import warnings
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import torchvision.transforms as transforms
-from sklearn.metrics import precision_score, accuracy_score, recall_score
 import numpy as np
-import pandas as pd
-from sklearn.metrics import classification_report
 from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
+from torch.optim import Adam
 
 
 class CustomDataset(Dataset):
@@ -110,7 +35,6 @@ class CustomDataset(Dataset):
             image = self.transform(image)
         return image, label
 
-# Transformation pipeline
 transform = transforms.Compose([
     transforms.ToPILImage(),
     transforms.Resize((224, 224)),  # Resize the image to 224x224
@@ -119,7 +43,6 @@ transform = transforms.Compose([
     transforms.RandomAffine(degrees=15, scale=(0.9, 1.1))
 ])
 
-# Load datasets
 data_path = Path(__file__).parent.parent
 train_x_path = data_path / "data/X_train.npy"
 train_y_path = data_path / "data/Y_train.npy"
@@ -129,7 +52,6 @@ test_y_path = data_path / "data/Y_test.npy"
 x_train, y_train = np.load(train_x_path), np.load(train_y_path)
 x_test, y_test = np.load(test_x_path), np.load(test_y_path)
 
-# Initialize datasets
 train_dataset = ImageDataset(train_x_path, train_y_path)
 test_dataset = ImageDataset(test_x_path, test_y_path)
 
@@ -142,9 +64,9 @@ class_weights = class_weights.to(device)
 
 
 class FocalLoss(nn.Module):
-    def __init__(self, weight=None, alpha=1.5, gamma=3, reduction='mean'):
+    def __init__(self, weight=None, alpha=1, gamma=2, reduction='mean'):
         super(FocalLoss, self).__init__()
-        self.weight = weight  # Class weights
+        self.weight = weight
         self.alpha = alpha
         self.gamma = gamma
         self.reduction = reduction
@@ -163,7 +85,6 @@ class FocalLoss(nn.Module):
             return F_loss
 
 
-# DataLoader
 batch_size = 64
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
@@ -171,17 +92,14 @@ train_batch_sampler = BatchSampler(batch_size=64, dataset=train_dataset, balance
 test_batch_sampler = BatchSampler(batch_size=64, dataset=test_dataset, balanced=True)
 
 
-# Initialize the model with updated weight parameters
 model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT)
 model.features[0][0] = nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1, bias=False)
 model.classifier[1] = nn.Linear(model.classifier[1].in_features, 6)
 
-# Prepare device, loss function, and optimizer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
-criterion = FocalLoss(alpha=1.5, gamma=3.0).to(device)
-optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-
+criterion = FocalLoss(alpha=1, gamma=2).to(device)
+optimizer = Adam(model.parameters(), lr=0.001)
 
 
 num_epochs = 10
@@ -212,7 +130,6 @@ for epoch in range(num_epochs):
     train_precision = precision_score(train_targets, train_preds, average=None)
     train_recall = recall_score(train_targets, train_preds, average=None)
     class_names = ['Atelectasis', 'Effusion', 'Infiltration', 'No Finding','Nodule','Pneumothorax']
-    # Validation
     model.eval()
     test_loss = 0.0
     correct = 0
@@ -241,8 +158,7 @@ for epoch in range(num_epochs):
     test_precision = precision_score(test_targets, test_preds, average=None)
     test_recall = recall_score(test_targets, test_preds, average=None)
 
-    torch.save(model.state_dict(), 'MobilNetlastt.pth')
-    # Generate classification report
+    torch.save(model.state_dict(), 'MobilNetFinal.pth')
     print("Train Classification Report:")
     print(classification_report(train_targets, train_preds,
                                 target_names=[class_index_to_name[i] for i in range(len(class_names))]))
@@ -253,4 +169,4 @@ for epoch in range(num_epochs):
           f"Train Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.2f}%, "
           f"Test Loss: {test_loss:.4f}, Test Acc: {test_accuracy:.2f}%")
 
-torch.save(model.state_dict(), 'MobilNetlast.pth')
+torch.save(model.state_dict(), 'MobilNetFinal1.pth')
