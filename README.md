@@ -30,9 +30,8 @@ Before training your model, you need to download the dataset:
 To train and evaluate the neural network:
 
 1. Ensure the dataset is downloaded as described in the previous section.
-2. Run `mobilenet.py` with your desired parameters. For example:
+2. Run `mobilenet.py` with your desired parameters.
 
-python mobilenet.py --nb_epochs 10 --batch_size 64 --balanced_batches
 
 ## Additional Information for Plotting Functionality
 
