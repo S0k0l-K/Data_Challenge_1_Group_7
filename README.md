@@ -51,3 +51,8 @@ To leverage the plotting functionality provided in `plots.py`, follow these step
 4. `plots.py` will generate the plots and save them in a specified directory. Ensure this directory is correctly set within `plots.py` to avoid file not found errors.
 
 This setup assumes you have implemented or will implement a script named `plots.py` for generating visualizations. Modify the instructions based on the actual implementation details of your plotting script.
+##Plotting for baseline model
+
+1. First run the `Net.py` file and the `train_test.py` file.
+2. Second run the `main.py` file and be sure that the `Netbaseline.pth` is there in your files.
+3. Run `plots baseline.py` to get the plots from the baseline model.
