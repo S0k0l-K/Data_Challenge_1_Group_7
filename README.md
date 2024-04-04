@@ -38,13 +38,9 @@ python mobilenet.py --nb_epochs 10 --batch_size 64 --balanced_batches
 
 To leverage the plotting functionality provided in `plots.py`, follow these steps:
 
-1. Ensure `matplotlib` and `seaborn` are installed in your environment. 
-    ```bash
-    pip install matplotlib seaborn
-    ```
-2. Be sure to run `mobilnet.py` first.
-3. Then run `plots.py` 
-4. Note: Be sure to check the paths are correct for your directories
+1. Be sure to run `mobilnet.py` first.
+2. Then run `plots.py` 
+3. Note: Be sure to check the paths are correct for your directories
 
 ## Plotting for baseline model
 
