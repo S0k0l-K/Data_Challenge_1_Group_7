@@ -104,6 +104,8 @@ def main(args: argparse.Namespace, activeloop: bool = True) -> None:
 
     # retrieve current time to label artifacts
     now = datetime.now()
+    model_file_path = f"Netbaseline.pth"
+    torch.save(model.state_dict(), model_file_path)
     # check if model_weights/ subdir exists
     if not Path("model_weights/").exists():
         os.mkdir(Path("model_weights/"))
