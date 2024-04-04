@@ -32,5 +32,22 @@ To train and evaluate the neural network:
 1. Ensure the dataset is downloaded as described in the previous section.
 2. Run `mobilenet.py` with your desired parameters. For example:
 
-```bash
 python mobilenet.py --nb_epochs 10 --batch_size 64 --balanced_batches
+
+## Additional Information for Plotting Functionality
+
+To leverage the plotting functionality provided in `plots.py`, follow these steps:
+
+1. Ensure `matplotlib` and `seaborn` are installed in your environment. These can be installed via pip if not already included in `requirements.txt`:
+    ```bash
+    pip install matplotlib seaborn
+    ```
+2. After training your model using `main.py`, `plots.py` can be used to generate visualizations such as loss curves and accuracy plots. To use `plots.py`, make sure it imports the required data from your training session, such as loss values and accuracy metrics. You might need to modify `plots.py` to correctly locate and load this data.
+3. Run `plots.py` with the Python command, specifying any required arguments. If arguments are implemented, use something like:
+    ```bash
+    python plots.py --loss_path=/path/to/loss_data.npy --accuracy_path=/path/to/accuracy_data.npy
+    ```
+    Replace `/path/to/loss_data.npy` and `/path/to/accuracy_data.npy` with the actual paths to your saved loss and accuracy data files.
+4. `plots.py` will generate the plots and save them in a specified directory. Ensure this directory is correctly set within `plots.py` to avoid file not found errors.
+
+This setup assumes you have implemented or will implement a script named `plots.py` for generating visualizations. Modify the instructions based on the actual implementation details of your plotting script.
