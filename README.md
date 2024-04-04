@@ -54,8 +54,9 @@ This setup assumes you have implemented or will implement a script named `plots.
 
 ## Plotting for baseline model
 
+If you run into any errors from the import part be sure to pip install that certain import (also the steps before this should be done first to be sure all the data used is downloaded)
+
 1. First run the `Net.py` file and the `train_test.py` file.
 2. Second run the `main.py` file and be sure that the `Netbaseline.pth` is there in your files.
 3. Run `plots baseline.py` to get the plots from the baseline model.
 
-If you run into any errors from the import part be sure to pip install that certain import (also the steps before this should be done first to be sure all the data used is downloaded)
