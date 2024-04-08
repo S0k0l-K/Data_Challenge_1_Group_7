@@ -19,7 +19,7 @@ model.features[0][0] = torch.nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1
 model.classifier[1] = torch.nn.Linear(model.last_channel, 6)
 
 # Load the trained model weights (temporarily required to update the path manually)
-model.load_state_dict(torch.load('MobilNet_.pth'))
+model.load_state_dict(torch.load('MobilNetFinal1.pth'))
 
 model.eval()
 cam = GradCAM(model=model, target_layers=target_layers)
