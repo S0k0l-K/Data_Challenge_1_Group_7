@@ -49,3 +49,13 @@ If you run into any errors from the import part be sure to pip install that cert
 2. Second run the `main.py` file and be sure that the `Netbaseline.pth` is there in your files.
 3. Run `plots baseline.py` to get the plots from the baseline model.
 
+## Grad-Cam visualizations for MobileNet
+
+If you run into any errors from the import part make sure to pip install that certain import
+
+1. Make sure you have the 'MobilNetFinal1.pth' (or change line 22 model.load_state_dict(torch.load('MobilNetFinal1.pth')) if you want to run it for another pth file)
+2. Run Grad-Cam.py
+
+It is currently visualizing the 10th image from the test dataset, if you want to change it go to line 32 image_to_display = np.squeeze(test[10]) and change the index to visualize other images
+
+
